@@ -954,6 +954,7 @@ spec:
                             extraArgs:
                               description: String of arguments to pass to the backup utility.
                               type: string
+                              default: ""
                           type: object
                       type: object
                     platform:

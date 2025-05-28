@@ -29,6 +29,10 @@ spec:
     dockerAccount:
       enabled: false
     backup:
+      s3:
+        enable: false
+      velero:
+        enabled: false
       cnpg:
         enabled: false
         pathPrefix: cnpg
