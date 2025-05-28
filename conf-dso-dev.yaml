@@ -1,0 +1,158 @@
+apiVersion: cloud-pi-native.fr/v1alpha
+kind: DsoSocleConfig
+metadata:
+  name: conf-dso
+spec:
+  additionalsCA:
+    - kind: ConfigMap
+
+  argocd:
+    subDomain: gitops
+    admin:
+      enabled: false
+    privateGitlabDomain: code.snc.minsi.fr
+
+  console:
+    subDomain: console
+    helmRepoUrl: https://benji78.github.io/forge-dso-helm-charts
+
+  exposedCA:
+    type: none
+
+  gitlab:
+    subDomain: code
+    extraCIVars: []
+    values:
+      global:
+        edition: ce
+        appConfig:
+          initialDefaults:
+            signupEnabled: false
+
+  global:
+    environment: production
+    metrics:
+      enabled: false
+    alerting: {}
+    offline: false
+    platform: kubernetes
+    projectsRootDir:
+      - forge
+    rootDomain: .pf.bbordes.fr
+    dockerAccount:
+      enabled: false
+    backup: {}
+    #   s3:
+    #     enable: false
+    #   velero:
+    #     enabled: false
+    #   cnpg:
+    #     enabled: false
+    #     pathPrefix: cnpg
+    #   gitlab:
+    #     enabled: false
+    #     pathPrefix: gitlab
+    #   vault:
+    #     enabled: false
+    #     pathPrefix: vault
+    #   vaultInfra:
+    #     enabled: false
+    #     pathPrefix: vault-infra
+
+    gitOps:
+      watchpointEnabled: false
+
+  grafana:
+    subDomain: metrologie
+
+  harbor:
+    adminPassword: 4Happy+harbor
+    subDomain: depot
+    postgresPvcSize: 10Gi
+    pvcRegistrySize: 50Gi
+
+  keycloak:
+    postgresPvcSize: 10Gi
+    subDomain: auth
+    values:
+      logging:
+        level: "INFO,com.worteks:DEBUG"
+      extraEnvVars:
+        - name: DSFR_THEME_SERVICE_TITLE
+          value: FDA Externe
+        - name: DSFR_THEME_BRAND_TOP
+          value: "Ministère<br/>de l'intérieur"
+        - name: DSFR_THEME_CONTACT_EMAIL
+          value: forge@anfsi.interieur.gouv.fr
+
+  nexus:
+    subDomain: proxy
+    proxyCacheSize: 25Gi
+    storageSize: 25Gi
+
+  prometheus:
+    crd:
+      type: external
+      version: v0.74.0
+  proxy:
+    enabled: false
+
+  sonarqube:
+    subDomain: sonar
+    postgresPvcSize: 25Gi
+    prometheusJavaagentVersion: 1.0.1
+    values:
+      # DaemonSet https://github.com/elastic/cloud-on-k8s/tree/main/config/recipes/autopilot
+      # extraInitContainers: # DOES NOT WORK
+      #     - name: max-map-count-check
+      #       command: ['sh', '-c', "while true; do mmc=$(cat /proc/sys/vm/max_map_count); if [ ${mmc} -eq 262144 ]; then exit 0; fi; sleep 1; done"]
+
+  vault:
+    subDomain: secret
+
+  certmanager:
+    # forcedInstall: true
+    values:
+      crds:
+        enabled: true
+        keep: true
+      global:
+        leaderElection:
+          namespace: cert-manager
+
+  cloudnativepg:
+    # forcedInstall: true
+    values:
+      affinity:
+        enablePodAntiAffinity: true # default
+        topologyKey: topology.kubernetes.io/zone
+        podAntiAffinityType: required
+
+  glexporter: {}
+  gitlabOperator: {}
+  gitlabrunner: {}
+
+  grafanaDatasource: {}
+  grafanaOperator: {}
+  kyverno: {}
+
+  ingress:
+    className: nginx # important! even if there is a default, for Ansible to be idempotent and not break existing ingresses
+    annotations:
+      cert-manager.io/cluster-issuer: acme-issuer
+    tls:
+      type: acme
+      acme:
+        email: benjaminbordes78@gmail.com
+        environment: production
+
+  argocdInfra:
+    installEnabled: false
+    admin: {}
+    # admin:
+    #   enabled: false
+  keycloakInfra:
+    installEnabled: false
+  vaultInfra:
+    installEnabled: false
+    # subDomain: vault

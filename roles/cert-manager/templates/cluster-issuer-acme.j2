@@ -15,4 +15,11 @@ spec:
       name: acme-issuer-account-key
     solvers:
     - http01:
-        ingress: {}
+        ingress:
+          ingressClassName: nginx
+          # ingressTemplate:
+          #   metadata:
+          #     # labels:
+          #     annotations:
+          #       kubernetes.io/ingress.class: gce-regional-external
+          #       kubernetes.io/ingress.regional-static-ip-name: gke-ext-ip
