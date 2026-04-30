@@ -56,8 +56,8 @@ Les éléments déployés seront les suivants :
 | CloudNativePG | <https://cloudnative-pg.io> |
 | Console Cloud π Native | <https://github.com/cloud-pi-native/console> |
 | GitLab | <https://about.gitlab.com> |
-| gitLab-ci-catalog | <https://github.com/cloud-pi-native/gitlab-ci-catalog> |
-| gitLab-ci-pipelines-exporter | <https://github.com/mvisonneau/helm-charts/tree/main/charts/gitlab-ci-pipelines-exporter> |
+| gitlab-ci-catalog | <https://github.com/cloud-pi-native/gitlab-ci-catalog> |
+| gitlab-ci-pipelines-exporter | <https://github.com/mvisonneau/helm-charts/tree/main/charts/gitlab-ci-pipelines-exporter> |
 | GitLab Operator | <https://docs.gitlab.com/operator> |
 | GitLab Runner | <https://docs.gitlab.com/runner> |
 | Grafana (optionnel) | <https://grafana.com> |
@@ -103,7 +103,7 @@ flowchart LR
         Infra_CM["Cert-Manager"]
       end
       subgraph infra-argocd["Ns: infra-argocd"]
-        Infra_ArgoCD["ArgoCD (Infra)"]
+        Infra_ArgoCD["Argo CD (Infra)"]
       end
       subgraph infra-cnpg["Ns: infra-cnpg"]
         Infra_CNPG["CNPG Operator"]
@@ -158,7 +158,7 @@ flowchart LR
           Socle_Vault["Vault"]
         end
         subgraph dso-argocd["Ns: dso-argocd"]
-          Socle_ArgoCD["ArgoCD"]
+          Socle_ArgoCD["Argo CD"]
         end
         subgraph dso-gitlab["Ns: dso-gitlab"]
           direction TB
@@ -210,7 +210,7 @@ flowchart LR
     %% Management / Relations
     %% =========================
 
-    %% Infra ArgoCD gère les Apps du Socle → hub
+    %% Infra Argo CD gère les Apps du Socle → hub
     Infra_ArgoCD -->|Manages Apps in Socle| Socle_Apps_Hub
 
     %% CNPG operators → clusters PG
@@ -246,7 +246,7 @@ flowchart LR
     Socle_Gitlab --> Socle_Gitlab_Runner
     Socle_Gitlab --> Socle_Gitlab_CI_Exporter
 
-    %% ArgoCD ↔ autres
+    %% Argo CD ↔ autres
     Socle_ArgoCD --> Socle_Vault
     Socle_ArgoCD --> Socle_Harbor
 
@@ -631,6 +631,8 @@ La version d'image utilisée par GitLab est directement liée à la version de c
 
 Par ailleurs le chart Helm de GitLab est déployé via l'opérateur GitLab, lui-même déployé via Helm.
 
+Les valeurs `dsc.gitlab.values` sont appliquées a l'instance GitLab (CR GitLab) et sont rendues dans `apps/gitlab/templates/gitlab.yaml` via `roles/gitops/rendering-apps-files/tasks/preliminary.yml`. Les valeurs `dsc.gitlabOperator.values` sont celles du chart de l'operateur GitLab et sont mergees dans les valeurs Helm du wrapper GitLab via `roles/gitops/rendering-apps-files/tasks/template.yml`.
+
 Il existe ainsi une correspondance directe entre la version de chart utilisée pour déployer l'opérateur et les versions de charts GitLab que cet opérateur sera en mesure d'installer.
 
 Cette correspondance est fournie par la page de documentation suivante :
@@ -639,7 +641,7 @@ https://gitlab.com/gitlab-org/cloud-native/gitlab-operator/-/tags
 
 Dans le même ordre d'idée, une version de chart GitLab correspond à une version d'instance GitLab.
 
-La correspondance entre versions de charts GitLab et versions d'instances Gitlab est fournie par la page de documentation suivante :
+La correspondance entre versions de charts GitLab et versions d'instances GitLab est fournie par la page de documentation suivante :
 
 https://docs.gitlab.com/charts/installation/version_mappings.html
 
@@ -914,7 +916,7 @@ Il est possible d'utiliser des secrets de type docker-registry pour le pull des 
 
 ### Gestion des secrets de type docker-registry
 
-L'**équipe Infrastructure** est chargée de créer les secrets de type docker-registry lors de la phase de provisionnement initial du cluster.  
+L'**équipe Infrastructure** est chargée de créer les secrets de type docker-registry lors de la phase de provisionnement initial du cluster.
 Si ces secrets ne sont pas présents ou ne peuvent pas être automatisés à la source, l'équipe Ops est responsable de leur **création manuelle** dans le cluster
 
 ### Configuration `dsc`
@@ -951,10 +953,10 @@ Il sera nécessaire pour activer le MFA sur les utilisateurs existants, de lance
 ansible-playbook admin-tools/keycloak-enforce-mfa.yml
 ```
 
-## Tests d'intégration 
+## Tests d'intégration
 
-Il est possible d'activer les tests d'intégration sur un environnement en spécifiant le paramètre `dsc.tests.installEnabled` à `true`.  
-Les notifications étant pour l'instant uniquement supporté sur Mattermost dans le code, il faudra alors récupérer l'id du channel et le token du bot pour les insérer dans le Vault d'infrastructure.  
+Il est possible d'activer les tests d'intégration sur un environnement en spécifiant le paramètre `dsc.tests.installEnabled` à `true`.
+Les notifications étant pour l'instant uniquement supporté sur Mattermost dans le code, il faudra alors récupérer l'id du channel et le token du bot pour les insérer dans le Vault d'infrastructure.
 Pour ce qui concerne les comptes de tests `testuser@example.com` et `secondtestuser@example.com`, il faudra s'assurer que :
 - leurs mots de passe correspondent à ceux qui sont insérés dans le Vault d'infrastructure.
 - le MFA n'est pas appliqué.
