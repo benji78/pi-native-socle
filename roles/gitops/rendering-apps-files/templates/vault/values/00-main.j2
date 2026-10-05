@@ -19,10 +19,62 @@ vault:
       apiAddr: "https://<path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#domain | jsonPath {.vault}>"
       raft:
         enabled: true
+{% if dsc.global.metrics.enabled %}
+        config: |
+          ui = true
+          disable_mlock = true
+          service_registration "kubernetes" {}
+          listener "tcp" {
+            tls_disable = 1
+            address = "[::]:8200"
+            cluster_address = "[::]:8201"
+            telemetry {
+              unauthenticated_metrics_access = "false"
+            }
+          }
+          storage "raft" {
+            path = "/vault/data"
+          }
+          telemetry {
+            prometheus_retention_time = "12h"
+            disable_hostname = true
+          }
+{% endif %}
     standalone:
       enabled: false
+{% if dsc.global.metrics.enabled %}
+      config: |
+        ui = true
+        disable_mlock = true
+        service_registration "kubernetes" {}
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          telemetry {
+            unauthenticated_metrics_access = "false"
+          }
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+        telemetry {
+          prometheus_retention_time = "12h"
+          disable_hostname = true
+        }
+{% endif %}
     auditStorage:
       enable: true
     dataStorage:
       enable: true
       size: {{ dsc.vault.pvcSize }}
+{% if dsc.global.metrics.enabled %}
+  serverTelemetry:
+    serviceMonitor:
+      enabled: true
+      authorization:
+        credentials:
+          name: {{ dsc_name }}-vault-keys
+          key: root_token
+      selectors: {{ dsc.global.metrics.additionalLabels | default({}, true) }}
+{% endif %}

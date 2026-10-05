@@ -341,6 +341,24 @@ spec:
         name: wildcard-tls
 ```
 
+##### CA supplémentaires pour Argo CD
+
+Argo CD utilise un bundle `rootCA` pour vérifier le certificat TLS de l'OIDC. En plus de la CA
+exposée via `spec.exposedCA`, vous pouvez ajouter une ou plusieurs CA avec
+`spec.argocd.values.oidcRootCA`. Cette valeur accepte une chaîne PEM ou une liste de chaînes PEM.
+Elle est fusionnée avec la CA du rôle, puis retirée des valeurs Helm finales.
+
+```yaml
+spec:
+  argocd:
+    values:
+      oidcRootCA:
+        - |
+          -----BEGIN CERTIFICATE-----
+          MIID...
+          -----END CERTIFICATE-----
+```
+
 ## Désinstallation
 
 ### Chaîne complète

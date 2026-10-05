@@ -162,10 +162,6 @@
         dest: "{{ gitops_local_repo }}/{{ dsc.spec.global.gitOps.repo.path }}/envs/{{ dsc_name }}/apps/global/templates/dsc.yaml"
         mode: "0644"
 
-- name: Set instance name fact
-  ansible.builtin.set_fact:
-    instance_name: "{{ dsc.metadata.name }}"
-
 - name: Set default config and releases facts
   ansible.builtin.set_fact:
     dsc_default_config: "{{ lookup('ansible.builtin.file', 'config.yaml') | from_yaml }}"

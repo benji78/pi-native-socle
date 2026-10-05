@@ -48,8 +48,8 @@ configs:
     policy.default: role:nada
     admin.enabled: "false"
   cm:
-{% if instance_name != "conf-dso" %}
-    application.instanceLabelKey: argocd.argoproj.io/instance.{{ instance_name }}
+{% if dsc_name != "conf-dso" %}
+    application.instanceLabelKey: argocd.argoproj.io/instance.{{ dsc_name }}
 {% endif %}
     clusterResources: "true"
     url: "https://{{ argocdinfra_domain }}"

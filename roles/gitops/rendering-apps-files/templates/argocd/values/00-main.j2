@@ -5,7 +5,7 @@ dsoZoneRepo: {{ dsoZoneRepo }}
 argocd:
   fullnameOverride: "{{ dsc_name }}-argocd"
   crds:
-    install: {{ not argo_infra_ownership }} 
+    install: {{ not argo_infra_ownership }}
     keep: true
 {% if dsc.global.platform == "openshift" %}
   openshift:
@@ -18,29 +18,178 @@ argocd:
 {% endif %}
     params:
       server.insecure: true
+    rbac:
+      scopes: "[groups]"
+      policy.default: role:nada
+      admin.enabled: "false"
+      policy.csv: |-
+        p, role:admin, *, *, */*, allow
+        p, role:nada, applicationsets, *, */*, deny
+        p, role:nada, applications, *, */*, deny
+        p, role:nada, logs, get, */*, allow
+        p, role:nada, exec, *, */*, deny
+        p, role:nada, certificates, *, *, deny
+        p, role:nada, accounts, *, *, deny
+        p, role:nada, gpgkeys, *, *, deny
+        p, role:nada, projects, *, *, deny
+        p, role:nada, clusters, *, *, deny
+        p, role:nada, repositories, get, *, allow
+        g, system:cluster-admins, role:admin
+        g, cluster-admins, role:admin
+        g, /admin, role:admin
+        g, admin, role:admin
+{% if dsc.global.environment == 'development' %}
+        p, cpin-sa, applications, *, *, allow
+{% endif %}
     cm:
-{% if instance_name != "conf-dso" %}
-      application.instanceLabelKey: argocd.argoproj.io/instance.{{ instance_name }}
+{% if dsc_name != "conf-dso" %}
+      application.instanceLabelKey: argocd.argoproj.io/instance.{{ dsc_name }}
 {% endif %}
       clusterResources: "true"
       url: "https://<path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#domain | jsonPath {.argocd}>"
+      oidc.config: |
+        issuer: https://<path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#domain | jsonPath {.keycloakx}>/realms/{{ dsc.keycloakx.applicationRealm }}
+        requestedScopes: ["openid", "generic"]
+        name: Keycloak
+        clientID: <path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/keycloakx/values#client | jsonPath {.argo.id}>
+        clientSecret: <path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/keycloakx/values#client | jsonPath {.argo.secret}>
+
       users.anonymous.enabled: "false"
       admin.enabled: "{{ dsc.argocd.admin.enabled | lower }}"
       kustomize.buildOptions: "--enable-helm"
+      resource.customizations.health.grafana.integreatly.org_GrafanaDashboard: |
+        hs = {}
+        hs.status = "Progressing"
+        hs.message = ""
+        if obj.status ~= nil then
+          hs.status = "Healthy"
+          hs.message = "Assumed healthy"
+        end
+        return hs
+      resource.exclusions: |
+        - apiGroups:
+          - tekton.dev
+          clusters:
+          - '*'
+          kinds:
+          - TaskRun
+          - PipelineRun
+        - apiGroups:
+          - wgpolicyk8s.io
+          - aquasecurity.github.io
+          clusters:
+          - '*'
+          kinds:
+          - '*'
+        - apiGroups:
+          - postgresql.cnpg.io
+          clusters:
+          - '*'
+          kinds:
+          - Backup
+        - apiGroups:
+          - reports.kyverno.io
+          clusters:
+          - '*'
+          kinds:
+          - EphemeralReport
+        - apiGroups:
+          - reports.kyverno.io/v1
+          clusters:
+          - '*'
+          kinds:
+          - EphemeralReport
 {% if dsc.global.environment == 'development' %}
       accounts.cpin-sa: apiKey
 {% endif %}
   redis-ha:
     enabled: true
     fullnameOverride: "{{ dsc_name }}-redis-ha"
+    image:
+      tag: 7.4.1-alpine
   controller:
     replicas: 3
+    metrics:
+      enabled: {{ dsc.global.metrics.enabled | lower }}
+      serviceMonitor:
+        enabled: {{ dsc.global.metrics.enabled | lower }}
   dex:
     enabled: false
   server:
     replicas: 3
   repoServer:
     replicas: 3
+    initContainers:
+{% if dsc.global.dockerAccount.enabled %}
+    - name: helm-login
+      image: {{ (dsc.global.registry | default('quay.io')) }}/argoproj/argocd:{{ argo_app_version }}
+      command: ["sh", "-c"]
+      args:
+        - |
+          cp /usr/local/bin/helm /helm-custom-binary/helm.bin;
+          cat <<'EOF' > /helm-custom-binary/helm
+          #!/usr/bin/env bash
+          args=($@)
+          if [ "$#" -gt 2 ] && [ $1 == "registry" ] && { [ "$2" = "login" ] || [ "$2" = "logout" ]; } && [ $3 == "registry-1.docker.io/bitnamicharts" ]; then
+            args[2]="registry-1.docker.io"
+          fi
+          helm.bin ${args[@]}
+          EOF
+          chmod +x /helm-custom-binary/helm;
+          echo $HELM_PASSWORD | helm registry login -u $HELM_USER registry-1.docker.io --password-stdin;
+      volumeMounts:
+      - mountPath: /helm-working-dir
+        name: helm-working-dir
+      - mountPath: /helm-custom-binary
+        name: helm-custom-binary
+{% if dsc.global.platform != "openshift" %}
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: false
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+{% endif %}
+      env:
+      - name: HELM_USER
+        valueFrom:
+          secretKeyRef:
+            name: helm-docker-registry-secret
+            key: username
+      - name: HELM_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: helm-docker-registry-secret
+            key: password
+      - name: HELM_CACHE_HOME
+        value: /helm-working-dir
+      - name: HELM_CONFIG_HOME
+        value: /helm-working-dir
+      - name: HELM_DATA_HOME
+        value: /helm-working-dir
+{% if dsc.proxy.enabled %}
+      - name: HTTP_PROXY
+        value: <path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#proxy | jsonPath {.httpProxy}>
+      - name: HTTPS_PROXY
+        value: <path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#proxy | jsonPath {.httpsProxy}>
+      - name: NO_PROXY
+        value: <path:{{ vaultinfra_kv_name }}/data/env/{{ dsc_name }}/apps/global/values#proxy | jsonPath {.noProxy}>,{{ dsc_name }}-argocd-repo-server
+{% endif %}
+    volumes:
+    - name: helm-custom-binary
+      emptyDir: {}
+    volumeMounts:
+    - name: helm-custom-binary
+      mountPath: /usr/local/bin/helm
+      subPath: helm
+    - name: helm-custom-binary
+      mountPath: /usr/local/bin/helm.bin
+      subPath: helm.bin
+{% endif %}
   applicationSet:
     replicas: 2
   notifications:
